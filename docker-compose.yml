@@ -1,91 +1,111 @@
-auth-service:
-  build: ./auth-service
-  ports:
-    - "8001:8082"
-  environment:
-    - DATABASE_URL=jdbc:postgresql://database/auth_db
-    - DATABASE_USER=user
-    - DATABASE_PASSWORD=password
-  depends_on:
-    - database
+services:
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "8001:8081"
+    environment:
+      - DATABASE_URL=jdbc:postgresql://auth-database:5432/auth_db
+      - DATABASE_USER=user
+      - DATABASE_PASSWORD=password
+    depends_on: [ auth-database ]
 
-user-service:
-  build: ./user-service
-  ports:
-    - "8002:8080"
-  environment:
-    - DATABASE_URL=jdbc:postgresql://database/user_db
-    - DATABASE_USER=user
-    - DATABASE_PASSWORD=password
-  depends_on:
-    - database
+  user-service:
+    build: ./user-service
+    ports:
+      - "8002:8082"
+    environment:
+      - DATABASE_URL=jdbc:postgresql://user-database:5432/user_db
+      - DATABASE_USER=user
+      - DATABASE_PASSWORD=password
+    depends_on: [ user-database ]
 
-transaction-service:
-  build: ./transaction-service
-  ports:
-    - "8003:8080"
-  environment:
-    - DATABASE_URL=jdbc:postgresql://database/transaction_db
-    - DATABASE_USER=user
-    - DATABASE_PASSWORD=password
-    - RABBITMQ_URL=amqp://user:password@rabbitmq
-  depends_on:
-    - database
-    - rabbitmq
+  transaction-service:
+    build: ./transaction-service
+    ports:
+      - "8003:8083"
+    environment:
+      - DATABASE_URL=jdbc:postgresql://transaction-database:5432/transaction_db
+      - DATABASE_USER=user
+      - DATABASE_PASSWORD=password
+      - RABBITMQ_URL=amqp://user:password@rabbitmq
+    depends_on: [ transaction-database, rabbitmq ]
 
-notification-service:
-  build: ./notification-service
-  ports:
-    - "8004:8080"
-  environment:
-    - RABBITMQ_URL=amqp://user:password@rabbitmq
-  depends_on:
-    - rabbitmq
+  notification-service:
+    build: ./notification-service
+    ports:
+      - "8004:8084"
+    environment:
+      - RABBITMQ_URL=amqp://user:password@rabbitmq
+    depends_on: [ rabbitmq ]
 
-bff:
-  build: ./bff
-  ports:
-    "8005:8080"
-  depends_on:
-    - auth-service
-    - user-service
-    - transaction-service
-    - notification-service
+  bff:
+    build: ./bff
+    ports:
+      - "8005:8085"
+    depends_on:
+      - auth-service
+      - user-service
+      - transaction-service
+      - notification-service
 
-database:
-  image: postgres:13
-  environment:
-    - POSTGRES_USER: user
-    - POSTGRES_PASSWORD: password
-    - POSTGRES_DB: auth_db
-  ports:
-    - "5432:5432"
-  volumes:
-    - postgres_data:/var/lib/postgresql/data
+  auth-database:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=auth_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
 
-rabbitmq:
-  image: rabbitmq:3-management
-  ports:
-    - "5672:5672"
-    - "15672:15672"
-  environment:
-    - RABBITMQ_DEFAULT_USER: user
-    - RABBITMQ_DEFAULT_PASS: password
+  transaction-database:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=transaction_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - transaction_postgres_data:/var/lib/postgresql/data
 
-api-gateway:
-  image: nginx:latest
-  ports:
-    - "80:80"
-  volumes: ./nginx.conf:etc/nginx/nginx.conf:ro
-  depends_on:
-    - bff
-    - auth-service
-    - user-service
-    - transaction-service
-    - notification-service
+  user-database:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=user_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - user_postgres_data:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=user
+      - RABBITMQ_DEFAULT_PASS=password
+
+  api-gateway:
+    build:
+      context: ./nginx
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - bff
+      - auth-service
+      - user-service
+      - transaction-service
+      - notification-service
 
 volumes:
-  postgres_data:
-    local
-
-
+  auth_postgres_data:
+  transaction_postgres_data:
+  user_postgres_data:
